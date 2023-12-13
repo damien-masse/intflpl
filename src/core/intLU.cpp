@@ -79,7 +79,7 @@ bool IntLU::buildBasisInternal() {
      int nbR, nbC; 
      isLU=true;
      for (int i=0;i<nbRows;i++) { 
-       double bv = this->bestPiv(nbR,nbC);
+       /* double bv = */ this->bestPiv(nbR,nbC);
        if (nbR==-1) { isLU=false; break; }
        this->computeNewRow(nbR,nbC);
      }

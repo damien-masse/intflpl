@@ -57,9 +57,9 @@ class Permut {
     private:
       const int nbA;
       const int nbB;
+      int defined;
       std::vector<int> direct;
       std::vector<int> reverse;
-      int defined;
 };
 
 inline int Permut::getnbA() const { return this->nbA; }

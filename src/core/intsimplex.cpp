@@ -24,11 +24,13 @@ namespace intflpl {
 Intsimplex::Intsimplex(int dim, int szalloc, bool useInterval) :
     dim(dim), sz(0), szalloc(szalloc), numobjcol(-1),
     objcolInd(0), status((1<<EMPTY) | 1<<(IDENTLEFT)),
-    matInit(dim,dim+szalloc,Interval::zero()),  objcol(dim,Interval::zero()),
-    matInitT(dim+szalloc,dim,Interval::zero()),
+    matInit(dim,dim+szalloc,Interval::zero()),
+    matInitT(dim+szalloc,dim,Interval::zero()),  
+    objcol(dim,Interval::zero()),
+    objrowInit(dim+szalloc,Interval::zero()),
     objrow_offset(dim+szalloc,Interval::zero()), 
     colstat(dim+szalloc,colstatus_Unused), 
-    objrowInit(dim+szalloc,Interval::zero()), useInterval(useInterval),
+    useInterval(useInterval),
     LUform(nullptr)
 {
     /* copy eye */
@@ -39,11 +41,12 @@ Intsimplex::Intsimplex(const IntervalVector &box, int szalloc,
 	 std::vector<cstrrhs_status> clstats, bool useInterval) :
     dim(box.size()), sz(0), szalloc(szalloc), numobjcol(-1),
     objcolInd(0), status(1<<IDENTLEFT),
-    matInit(dim,dim+szalloc,Interval::zero()), objcol(dim,Interval::zero()),
-    matInitT(dim+szalloc,dim,Interval::zero()),
+    matInit(dim,dim+szalloc,Interval::zero()),
+    matInitT(dim+szalloc,dim,Interval::zero()), objcol(dim,Interval::zero()),
+    objrowInit(dim+szalloc,Interval::zero()),
     objrow_offset(dim+szalloc,Interval::zero()), 
     colstat(dim+szalloc,colstatus_Unused),
-    objrowInit(dim+szalloc,Interval::zero()), useInterval(useInterval),
+    useInterval(useInterval),
     LUform(nullptr)
 {
     /* copy eye */
@@ -81,7 +84,7 @@ void Intsimplex::change_basis(int oldcol, int ncol) {
 }
 
 void Intsimplex::recompute_objoffset() {
-    LUform->extendXMeqA(objrow_offset);
+    objrow_offset=LUform->extendXMeqA(objrow_offset);
 }
 
 
@@ -141,7 +144,7 @@ int Intsimplex::load_constraint(const std::pair<CstrVect,CstrRhs> newcst) {
 }
 
 void Intsimplex::loadObjRow(const IntervalVector &row, std::vector<cstrrhs_status> clstats) {
-    assert(status[IDENTLEFT]);
+//    assert(status[IDENTLEFT]);
     for (int i=0;i<dim+sz;i++) {
         objrowInit[i]=row[i];
         colstat[i].reset();
@@ -151,7 +154,7 @@ void Intsimplex::loadObjRow(const IntervalVector &row, std::vector<cstrrhs_statu
 }
 
 void Intsimplex::changeObjRowCol(int col, const Interval &val, cstrrhs_status clstat) {
-    assert(status[IDENTLEFT]);
+//    assert(status[IDENTLEFT]);
     objrowInit[col]=val;
     colstat[col].reset();
     if (!clstat[LB_R]) colstat[col].set(HASLB);
@@ -159,7 +162,7 @@ void Intsimplex::changeObjRowCol(int col, const Interval &val, cstrrhs_status cl
 }
 
 void Intsimplex::extendObjRowCol(int col, double val) {
-    assert(status[IDENTLEFT]);
+//    assert(status[IDENTLEFT]);
     objrowInit[col].inflate(val);
 }
 
@@ -231,7 +234,7 @@ int Intsimplex::check_entry_col_C(int colR, const IntervalVector &R,
        biasedR = obj;
        for (int i=0;i<dim;i++) {
            if (i==rowC) continue;
-           biasedR[i] -= ratio*obj[i];
+           biasedR[i] -= ratio*R[i];
            if (biasedR[i].lb()>0) sign[i]=1;
            else 
            if (biasedR[i].ub()<0) sign[i]=-1;
@@ -245,6 +248,7 @@ int Intsimplex::check_entry_col_C(int colR, const IntervalVector &R,
     }
     /* yiRi must be in Ri*objrowInit[rowC] */
     Interval goal = R[rowC]*objrowInit[basis[rowC]];
+//    std::cerr << "   yi " << (yiRi/R[rowC]) << "\n";
     if (yiRi.ub()>goal.ub()) { /* a bit too high */
        bool ok = yiRi.lb()<=goal.ub(); /* ok=false: clearly too high */
        for (int i=0;i<dim;i++) {
@@ -255,7 +259,7 @@ int Intsimplex::check_entry_col_C(int colR, const IntervalVector &R,
             if (sr.ub()<0.0) {
               sign[i] = -sign[i];
               yiRi += sr*objrowInit[basis[i]].diam();
-              if (yiRi.ub()<=goal.ub()) break;
+              if (yiRi.ub()<=goal.ub()) { ok=true; break; }
               if (yiRi.lb()<=goal.ub()) ok=true;
             }
           } 
@@ -276,7 +280,7 @@ int Intsimplex::check_entry_col_C(int colR, const IntervalVector &R,
             } 
          }
        }
-    } else if (yiRi.lb()>bd.ub()) {
+    } else if (yiRi.lb()<goal.lb()) {
        bool ok = yiRi.ub()>=goal.lb(); /* ok=false: clearly too high */
        for (int i=0;i<dim;i++) {
           if (i==rowC) continue;
@@ -286,7 +290,7 @@ int Intsimplex::check_entry_col_C(int colR, const IntervalVector &R,
             if (sr.lb()>0.0) {
               sign[i] = -sign[i];
               yiRi += sr*objrowInit[basis[i]].diam();
-              if (yiRi.lb()>=goal.lb()) break;
+              if (yiRi.lb()>=goal.lb()) { ok = true; break; }
               if (yiRi.ub()>=goal.lb()) ok=true;
             }
           } 
@@ -336,6 +340,7 @@ int Intsimplex::check_entry_col(int col, Interval &res, const Permut &basis,
     /* check satisfiability and emptiness */
     Interval sumInt = Interval::zero();
     Interval sumPt = objrow_offset[col]+bd;
+//    std::cerr << "   col " << col << " sumPt " << sumPt << "\n";
     if (sumPt.contains(0.0)) return -1; /* ok */
     asup = sumPt.ub()<0.0;
     if (asup) { if  (!colstat[col][HASUB]) return -1; }
@@ -351,10 +356,11 @@ int Intsimplex::check_entry_col(int col, Interval &res, const Permut &basis,
     IntervalVector obj_local(dim);
     if (objcolInd==0) {
        obj_local = LUform->MbXeqA(this->objcol);
-    } else if (col==numobjcol) {
-       obj_local=R;
-    } else {
-       obj_local = LUform->MbXeqCol(numobjcol);
+    } else { if (col==numobjcol) {
+          obj_local=R;
+       } else {
+          obj_local = LUform->MbXeqCol(numobjcol);
+       }
        if (objcolInd==-1) obj_local = -obj_local;
     }
     /* now we check the different rows */
@@ -370,8 +376,9 @@ int Intsimplex::check_entry_col(int col, Interval &res, const Permut &basis,
         std::vector<int> sign_new(act_sign);
         Interval result;
         int ret = check_entry_col_C(col, 
-		R, obj_local, ratio, objrowInit[basis[i]],
+		R, obj_local, ratio, objrowInit[col],
 		asup, basis, sign_new, result, i);
+//        std::cerr << "     exit : " << i << ";" << basis[i] << " ret " << ret << " result " << result << "\n";
         if (ret<0) continue;
         if (brow==-1 || (res.ub()>result.ub() ||
 		(res.ub()==result.ub() && basis[i]<basis[brow]))) {
@@ -405,13 +412,11 @@ bool Intsimplex::generate_init_basis_internal(double mult,
           objrow_offset[i]=-objrowInit[i].lb();
           colstat[i][NEGBASIS]=true;
        } 
-       colstat[i][INBASIS]=true;
-       colstat[i][LOCKEDIN]=false;
+       assign_filter(colstat[i],colstatus_InBasis,colstatus_BasisFilter);
     }
     for (int i=dim;i<dim+sz;i++) {
        if  (colstat[i][UNUSED]) continue;
-       colstat[i][OUTBASIS]=true;
-       colstat[i][LOCKEDIN]=false;
+       assign_filter(colstat[i],colstatus_OutBasis,colstatus_BasisFilter);
     }
     recompute_objoffset();
     status[IDENTLEFT]=false;
@@ -423,8 +428,9 @@ bool Intsimplex::generate_init_basis_internal(double mult,
 }
 
 bool Intsimplex::generate_init_basis(const IntervalVector &column, bool getub) {
-    assert(status[IDENTLEFT]);
+//    assert(status[IDENTLEFT]);
     objcolInd=0;
+    numobjcol=-1;
     for (int i=0;i<dim;i++) {
         objcol[i]=(getub ? column[i] : -column[i]);
     }
@@ -432,16 +438,16 @@ bool Intsimplex::generate_init_basis(const IntervalVector &column, bool getub) {
 }
 
 bool Intsimplex::generate_init_basis(int col, bool getub) {
-    assert(status[IDENTLEFT]);
+//    assert(status[IDENTLEFT]);
     objcolInd=getub ? 1 : -1;
     objcol=(getub ? matInitT[col] : -matInitT[col]);
     numobjcol=col;
-    return this->generate_init_basis_internal(getub ? 1.0 : -1.0,objcol);
+    return this->generate_init_basis_internal(1.0,objcol);
 }
 
 
 int Intsimplex::check_entry_obj(int colout, const IntervalVector &RowB,
-		bool &sign, double &bcoef) const {
+		bool &toup, double &bcoef) const {
     bool isup = !colstat[colout][NEGBASIS];
     int bestin = -1;
     Interval bgap(0.0);
@@ -466,7 +472,7 @@ int Intsimplex::check_entry_obj(int colout, const IntervalVector &RowB,
        if (bestin==-1 || resgap.ub()<bgap.ub()) {
           bestin=colin;
           resgap = bgap;
-          sign = (toupper ? 1.0 : -1.0);
+          toup = toupper;
        }
     }
     bcoef = bgap.ub();
@@ -510,12 +516,15 @@ simplex_ret Intsimplex::simplex_mat() {
    assert(!status[INVALCOL]);
    assert(!status[INVALROW]);
    simplex_ret retval=0;
-//   std::cerr << "simplex_max " << mat << "\n" << objrow << "\n";
+//   std::cerr << "simplex_max " << matInit << "\n" << objrowInit << "\n";
 //   std::cerr << "lastcol " << lastcol << "\n";
 //   for (auto &a : colstat) std::cerr << a << " ";
 //   std::cerr << "\n";
    bool debug=false;
    while (nb_iter<maxit) {
+//       std::cerr << "current point : " << (-objrow_offset) << "\n";
+//       std::cerr << "basis : " << LUform->getColBasis() << "\n";
+//       std::cerr << "objective : " << get_objective_value() << "\n";
        if (nb_iter>3*maxit/4) {
                 std::cerr << "nbiter : " << nb_iter << "\n";
                 debug=true;
@@ -545,7 +554,7 @@ simplex_ret Intsimplex::simplex_mat() {
                 std::cerr << "res empty!!!\n";
                 std::cerr << matInit << "\n";
                 std::cerr << objrowInit << "\n";
-                std::cerr << "LU: " << LUform << "\n";
+                std::cerr << "LU: " << (*LUform) << "\n";
                 continue;
            }
            double nobj = res.ub();
@@ -586,7 +595,7 @@ simplex_ret Intsimplex::simplex_mat() {
       std::cerr << "mat " << matInit << "\n";
       std::cerr << "objrow_offset " << objrow_offset << "\n";
       std::cerr << "objrowInit " << objrowInit << "\n";
-      std::cerr << "LU : " << LUform << "\n";
+      std::cerr << "LU : " << (*LUform) << "\n";
       return simplexret_MaxIter;
    }
 //   if (retval[APPROXBASIS]) std::cerr << "sortie approx " << nb_iter << "\n";
@@ -627,7 +636,7 @@ std::list<Vector>
       /* identifying the exiting basis */
       int basisout=-1;
       int ncol=-1;
-      bool bsign;
+      bool btoup;
       for (int i=0;i<dim;i++) {
 //          std::cout << "i= " << i << ":";
           /* is this basis movable (not equality) ? */
@@ -637,32 +646,34 @@ std::list<Vector>
              __but__ all intervals must stay around 0... hence we try
 	     the minimum possible > 0 */
           IntervalVector RowB = LUform->extendXMeqRow(i);
-          bool sign;
+          bool toup;
           double bcoef;
 	  
-          int ncol = check_entry_obj(i,RowB,sign,bcoef);
+          int ncol = check_entry_obj(i,RowB,toup,bcoef);
 
           assert (ncol!=-1); /* can't find a move, theoretically not possible
                               as it is bounded 
 				FIXME : unbounded modification ? */
 //          std::cout << "\n";
-          gain=bcoef; basisout=i; bsign=sign; break; /* 2D => only one move ! */
+          gain=bcoef; basisout=i; btoup=toup; break; /* 2D => only one move ! */
        }
        /* maintenant on se contente de faire entrer/sortir ncol */
        if (ncol==-1) { 
            std::cerr << "basis = " << basis ;
           std::cerr << "\ncolstat = "; for (int q=0;q<dim+sz;q++) std::cerr << colstat[q] << " ";
           std::cerr << "matInit = " << matInit << "\n";
-          std::cerr << "LU = " << LUform << "\n";
+          std::cerr << "objrowInit = " << objrowInit << "\n";
+          std::cerr << "objrowOffset = " << objrow_offset << "\n";
+          std::cerr << "LU = " << (*LUform) << "\n";
           status[INVALCOL]=true; return lstret;
        }
-       colstat[ncol][NEGBASIS]=(bsign==-1);
-       objrow_offset[ncol]=-(bsign==1 ?
+       colstat[ncol][NEGBASIS]=(!btoup);
+       objrow_offset[ncol]=-(btoup ?
 			objrowInit[ncol].ub() :
 		        objrowInit[ncol].lb());
        this->change_basis(basisout,ncol);
        this->recompute_objoffset();
-       lastin = ncol*2; if (bsign==-1) lastin++;
+       lastin = ncol*2; if (!btoup) lastin++;
        /* si on est sur la base initiale, on s'arrête... */
        fini=ibasis[lastin];
        ibasis[lastin]=true;

@@ -1,0 +1,6 @@
+#include "flpl_def.h"
+#include "permut.h"
+#include "intLU.h"
+#include "intsimplex.h"
+#include "intcstrvect.h"
+#include "intpoly.h"

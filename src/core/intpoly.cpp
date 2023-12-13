@@ -16,25 +16,25 @@
 #include <cmath>
 #include <ibex.h>
 #include "intsimplex.h"
+#include "intcstrvect.h"
 #include "intpoly.h"
 
-namespace intsimplex {
+namespace intflpl {
 
-#if 1
-static int maxsize=0;
-#endif
+static unsigned int maxsize=0;
+static constexpr double threshold=1e-5;
 
 ExpPoly::ExpPoly(int dim, bool empty) :
   dim(dim), dim_not_flat(empty ? -1 : dim), 
   Box(dim, (empty ? Interval::empty_set() : Interval::all_reals())),
-  Inc(Box), BoxStat(dim, 0),
+  BoxStat(dim, 0), Inc(Box),
   minimized(0), csts()
 {  }
 
 ExpPoly::ExpPoly(const IntervalVector &Box) : 
   dim(Box.size()), dim_not_flat(Box.is_empty() ? -1 : 0),
-  BoxStat(dim, (1<<LB_NR) | (1<<UB_NR)),
-  minimized(0), Box(Box), Inc(Box), csts() {
+  Box(Box), BoxStat(dim, (1<<LB_NR) | (1<<UB_NR)),
+  Inc(Box), minimized(0), csts() {
   if (dim_not_flat==0) 
     for (int i=0;i<dim;i++) 
          if (!this->Box[i].is_degenerated()) dim_not_flat++;
@@ -48,9 +48,10 @@ ExpPoly::ExpPoly(const IntervalVector &Box, const std::vector<std::pair<Interval
 }
 
 ExpPoly::ExpPoly (const ExpPoly &P) :
-     dim(P.dim), dim_not_flat(P.dim_not_flat), BoxStat(P.BoxStat),
+     dim(P.dim), dim_not_flat(P.dim_not_flat), Box(P.Box),
+     BoxStat(P.BoxStat),
      Inc(P.Inc),
-     Box(P.Box), csts(P.csts), minimized(P.minimized) {
+     minimized(P.minimized), csts(P.csts)  {
 }
 
 bool ExpPoly::satisfy_cst (const std::pair<const CstrVect,CstrRhs> &cst) const {
@@ -390,7 +391,7 @@ ExpPoly &ExpPoly::operator|=(const ExpPoly &Q) {
     }
 #endif
 #if 1
-    int actsize=this->csts.size()+Q.csts.size()+c1.size();
+    unsigned int actsize=this->csts.size()+Q.csts.size()+c1.size();
     if (actsize>maxsize) {
        maxsize = actsize;
        std::cout << "new size : " << maxsize << " : " << (*this) << "\n" << Q << "\n";
@@ -644,7 +645,6 @@ void ExpPoly::vertices2D(std::vector<double>&X, std::vector<double>&Y) {
    }
    std::map<double,double>::iterator it1=rwcsts.begin();
    std::map<double,double>::iterator it2=it1; it2++;
-   double px, py;
    bool ok=true;
    while (ok) {
      double px = (it1->second*sin(it2->first)-it2->second*sin(it1->first))/
@@ -738,7 +738,7 @@ std::list<std::list<Vector>> ExpPoly::getFacets3D(const IntervalVector &pos, boo
 
 #define TEST_POLY	0
 #if (TEST_POLY)
-using namespace invariant;
+using namespace intflpl;
 
 /* test de simplex_form */
 int main() {
@@ -756,7 +756,7 @@ int main() {
    cst[0]=1; cst[1]=0.295813;  cst[2]=-0;
    csts.push_back(std::pair<IntervalVector,Interval>(cst,Interval(0.5787792319480085, 0.7660014045188111)));
 
-   ExpPoly ep(ivbox,csts,false);
+   ExpPoly ep(ivbox,csts);
  
    ep.unflat(1,Interval(0,0.4));
    std::cout << ep << "\n";

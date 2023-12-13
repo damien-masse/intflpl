@@ -92,6 +92,10 @@ Interval simplex_form(int dim, const IntervalVector &ivbox,
      const CstrVectMap &csts,
      const Vector &obj);
 
+IntervalVector generate_including_box(const IntervalVector &ivbox,
+                const  Intsimplex &simp,const CstrVectMap &csts,
+                const std::vector<CstrVectMap::iterator> &intmap);
+
 std::list<Vector>
                 generate_facet(const IntervalVector &ivbox,
                  std::vector<cstrrhs_status> clstats,

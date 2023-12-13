@@ -30,16 +30,15 @@ std::list<Vector> generate_facet(const IntervalVector &ivbox,
                  const CstrVectMap &csts, int dm, bool upper) {
     assert(ivbox.size()==3);
     int sz = csts.size();
-    int dim = ivbox.size();
     Intsimplex simp(ivbox,sz,clstats);
-    int colCst = dm;
     for (const std::pair<const CstrVect,CstrRhs> &cst : csts) {
         simp.load_constraint(cst);
     }
     if (!simp.generate_init_basis(dm,upper)) { return std::list<Vector>(); }
     simplex_ret sret = simp.simplex_mat();
     if (sret[INFEASIBLE]) return std::list<Vector>();
-    if (simp.get_basis()[dm] != dm) { /* pas une facette ? */
+    if (simp.get_basis()[dm] != dm) { 
+			/* FIXME : peut-être pas une bonne approche? */
                return std::list<Vector>(); }
     simp.lock_row(dm,true);
     return simp.generate_vertices_2D(ivbox);
@@ -306,7 +305,7 @@ int simplify_polyhedron(int dim, IntervalVector &ivbox,
 /* generate an including box from the result of a simplex computation */
 /* except for flat dimension, we need the mid of the result to be inside
    the polyhedron and not at the boundary */
-static IntervalVector generate_including_box(const IntervalVector &ivbox,
+IntervalVector generate_including_box(const IntervalVector &ivbox,
 		const  Intsimplex &simp,const CstrVectMap &csts,
 		const std::vector<CstrVectMap::iterator> &intmap) {
    Vector start = simp.getExtremalPoint(ivbox);
@@ -491,7 +490,7 @@ int simplify_polyhedron(int dim, IntervalVector &ivbox,
    }
    if (nb_non_flat<=1) { csts.clear(); inc=ivbox; return nb_non_flat; }
    /* now we minimize and keep (or not) the different constraints */
-   for (int i=0;i<intmap.size();i++) {
+   for (unsigned int i=0;i<intmap.size();i++) {
        CstrVectMap::iterator csts_it=intmap[i];
        if (csts_it == csts.end()) continue;
        simp.extendObjRowCol(i+dim,1.0);

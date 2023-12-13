@@ -96,7 +96,7 @@ class Intsimplex {
     /** status of simplex return (simplex_ret) defined in explibdef.h */
     const simplex_ret simplexret_Infeasible = (1 << INFEASIBLE);
     const simplex_ret simplexret_MaxIter = 
-			(1 << APPROXBASIS) || (1 << REACHEDLIMIT);
+			(1 << APPROXBASIS) | (1 << REACHEDLIMIT);
 
     /** constraint the matrix using ibex::bwd_mul. can be useful
      *  e.g. if the leftinitial basis is unbounded, as it may give a bound.
@@ -134,6 +134,9 @@ class Intsimplex {
    using colstatus = std::bitset<SIZECOLSTATUS>;
    const colstatus colstatus_Changebasis = (1 << INBASIS) | (1 << OUTBASIS);
    const colstatus colstatus_Unused = (1 << UNUSED);
+   const colstatus colstatus_BasisFilter = (1 << UNUSED) | (1 << INBASIS) |  (1 << OUTBASIS) | (1<<LOCKEDIN);
+   const colstatus colstatus_InBasis = (1 << INBASIS);
+   const colstatus colstatus_OutBasis = (1 << OUTBASIS);
 
 		    
 /** generating the vertices of a facet, from an already optimal matrix.
@@ -142,25 +145,24 @@ class Intsimplex {
     std::list<Vector> generate_vertices_2D(const IntervalVector &ivbox);
 
    private:
-      bool useInterval; /* interval in the initial matrix
-			   are used for [-1,+1] columns */
-      int dim, sz, numobjcol; /* dim : dimension (number of rows)
+      int dim, sz, szalloc, numobjcol; /* dim : dimension (number of rows)
 		       sz : columns used (+dim)
+                       szalloc : allocated place in the matrix, +dim 
 		       objcol : column used for the objective */
       int objcolInd;    /* =0 : lastcol is "independant" (=objcol)
                            =1 : lastcol is equal to one constraint 
                            =-1: lastcol is the negation of one constraint */
-      int szalloc; /* allocated place in the matrix, +dim */
-
+      simplex_stat status;
       IntervalMatrix matInit; /* initial matrix */
       IntervalMatrix matInitT; /* transpose of initial matrix */
       IntervalVector objcol;   /* objective column, when not last */
-      IntervalVector objrowInit; /* initial last row */
-      IntLU *LUform; /* LU form */
 
+      IntervalVector objrowInit; /* initial last row */
       IntervalVector objrow_offset; /* offset for the last row */
-      simplex_stat status;
       std::vector<colstatus> colstat;
+      bool useInterval; /* interval in the initial matrix
+			   are used for [-1,+1] columns */
+      IntLU *LUform; /* LU form */
       static const int maxit = 1000;
 
 /** change_basis : change the basis of the matrix
@@ -196,7 +198,7 @@ class Intsimplex {
  *  gain : the maximum "gain", i.e. the move on the polyhedron
  *  return : true if definitely possible, false if maybe not possible */
       int check_entry_obj(int colout, const IntervalVector &RowB,
-                bool &sign, double &bcoef) const;
+                bool &toup, double &bcoef) const;
 
     bool generate_init_basis_internal(double mult, const IntervalVector &obj);
 

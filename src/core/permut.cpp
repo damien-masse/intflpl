@@ -35,11 +35,10 @@ Permut::Permut(int _nbA, int _nbB, const Permut &P):
     defined(0), direct(_nbA,-1), reverse(_nbB,-1)
 {  size_t i=0;
    int nbC=P.getnbA(); 
-   int nbD=P.getnbB();
-   for (;i<nbC;i++) {
+   for (;i<(size_t) nbC;i++) {
       if (nbC>=nbA) break;
       if (P.direct[i]<0 || P.direct[i]>=nbB) break;
-      this->direct[i]=P.direct[i]; this->reverse[P.direct[i]]=i;
+      this->direct[i]=P.direct[i]; this->reverse[(size_t) P.direct[i]]=i;
    } 
    this->defined=i;
 }

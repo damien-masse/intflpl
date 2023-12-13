@@ -22,62 +22,9 @@
 #include <cmath>
 
 #include "flpl_def.h"
+#include "intcstrvect.h"
 
 namespace intflpl {
-
-CstrVect traduit_vect(const IntervalVector &box,
-		const Vector &v, Interval &bounds);
-CstrVect traduit_vect(const IntervalVector &box,
-		const IntervalVector &v, Interval &bounds);
-
-inline bool operator==(const CstrVect &lhs, const CstrVect& rhs) {
-   return (lhs.bdim==rhs.bdim && lhs.vdim==rhs.vdim &&
-          lhs.vect==rhs.vect);
-}
-inline bool operator!=(const CstrVect &lhs, const CstrVect& rhs) {
-   return (lhs.bdim!=rhs.bdim || lhs.vdim!=rhs.vdim ||
-          lhs.vect!=rhs.vect);
-}
-      
-
-struct CstrVectComp {
-inline bool operator()(const CstrVect& lhs, const CstrVect& rhs) const
-    {
-        if (lhs.bdim<rhs.bdim) return true;
-        else if (lhs.bdim>rhs.bdim) return false;
-        if (lhs.vdim<rhs.vdim) return true;
-        else if (lhs.vdim>rhs.vdim) return false;
-        for (int i=0;i<lhs.vect.size();i++) 
-           if (lhs.vect[i]<rhs.vect[i]) return true;
-           else if (lhs.vect[i]>rhs.vect[i]) return false;
-        return false;
-    }
-};
-
-struct CstrVectMap : std::map<CstrVect,CstrRhs,CstrVectComp> {
-//      CstrVectMap();
-//      CstrVectMap(const CstrVectMap &cvm);
-      
-#if 0
-      bool and_constraint(const IntervalVector &box,
-			  const Vector &v, Interval &&i);
-#endif
-      POLYOP_RET and_constraint(const IntervalVector &box,
-			  const CstrVect &v, const Interval &bounds,
-			  const cstrrhs_status stat=0);
-      POLYOP_RET and_constraint(const IntervalVector &box,
-			  const CstrVect &v, const CstrRhs &rhs);
-#if 0
-      bool and_constraint(const IntervalVector &box,
-			  const CstrVect &&v, Interval &&i);
-      bool and_constraint(const IntervalVector &box,
-			  CstrVect &&v, const Interval &i);
-      bool and_constraint(const IntervalVector &box,
-			  CstrVect &&v, Interval &&i);
-#endif
-//      friend class ExpPoly;
-};
-
 
 /** representation of polyhedron with ivbox and interval constraints */
 class ExpPoly
