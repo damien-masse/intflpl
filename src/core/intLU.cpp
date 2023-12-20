@@ -46,7 +46,6 @@ double IntLU::bestPiv(int &nbR, int &nbC) const {
          }
          if (bestCol!=-1) {
             double nvVal = ((sumRad*sumRad+0.001)*minRatio)/sumMagSq;
-         std::cout << "row: " << r << " bcol: " << bestCol << " val: " << nvVal << "\n";
             if (nbR==-1 || nvVal<bstVal) {
                nbR=r; nbC=bestCol; bstVal=nvVal;
             }
@@ -128,14 +127,63 @@ const IntervalMatrix &IntLU::getU() const {
     return this->UpM;
 }
 
+bool IntLU::inLUform() const {
+    return this->isLU;
+}
+
+IntervalMatrix IntLU::getInvB() const {
+     bool exact = (nbRows==nbCols);
+     IntervalMatrix ret(nbRows,nbRows);
+     /* get ret as permutation of lines of LowM */
+     for (int i=0;i<nbRows;i++) {
+         ret[i] = LowM[exact ? PmRows[PmCols.rev(i)] : i];
+               /* exact => LowM[PmRow[x]] = ret[PmCols[x]] */
+     }
+     for (int i=nbRows-1;i>=0;i--) {
+        int col = PmCols[i];
+        int row = PmRows[i];
+        IntervalVector &rw=ret[exact ? col : row]; 
+				  /* LowM[PmRow[i]] = ret[PmCols[i]] */
+        const Interval &pivot = UpM[row][col];
+        for (int j=0;j<i;j++) {
+           int row2 = PmRows[j];
+           int col2 = PmCols[j];
+           ret[exact ? col2 : row2] -= (UpM[row2][col]/pivot)*rw;
+        }
+        for (int j=0;j<nbRows;j++) {
+           rw[j] /= pivot;
+        }
+     }
+     return ret;
+}
+
 Interval IntLU::getDeterminant() const {
     if (!isLU) return Interval::all_reals();
     Interval ret(1.0);
+    std::vector<bool> a(nbRows,0);
     for (int i=0;i<nbRows;i++) {
-       int row= PmRows[i];
        int col= PmCols[i];
+       int row= PmRows[i];
        ret *= UpM[row][col];
        ret /= LowM[row][row];
+    }
+    if (nbRows==nbCols) {
+        int sig=0;
+        std::vector<bool> vu(nbRows, false);
+        int nbvus=0;
+        while (nbvus<nbRows) {
+          int i=0;
+          while (vu[i] && i<nbRows-1) i++;
+          if (vu[i]) break;
+          int cnt=0;
+          while  (!vu[i]) {
+             cnt=cnt+1;
+             vu[i]=true; nbvus++;
+             i = PmCols[PmRows.rev(i)];
+          }
+          if (cnt%2==0) sig= -sig;
+        }     
+        ret *= sig;
     }
     return ret;
 }

@@ -34,9 +34,16 @@ class IntLU {
       /* reset build */
       bool buildBasis();
 
+      /* LU worked */
+      bool inLUform() const;
 
       const IntervalMatrix &getLInv() const;
       const IntervalMatrix &getU() const;
+ 
+      /* get the "inverse"  of the matrix 
+         if nbRows=nbCols, the row order is preserved 
+         otherwise, the rows are "in built order" */
+      IntervalMatrix getInvB() const;
 
       Interval getDeterminant() const;
 
@@ -44,7 +51,7 @@ class IntLU {
          components outside the "basis" eq to 0. dim(A)=nbR, dim(X)=nbC */
       IntervalVector MXeqA(const IntervalVector& A) const;
       /* solve M'X = A, where M' is the restriction of M to the ``basis''
-         column, "in basis order" */
+         column, "in built order" */
       IntervalVector MbXeqA(const IntervalVector& A) const;
       /* solve M'X = Mcol, where M' is the restriction of M to the ``basis''
          column, and Mcol the column col of M */

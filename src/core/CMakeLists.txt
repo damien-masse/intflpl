@@ -20,9 +20,10 @@ set(HEADERS
   intsimplex.h
   intcstrvect.h
   intpoly.h
+  intpoly_inline.hpp
+  intflpl.h
 )
 
-# file(COPY ${HEADERS} DESTINATION ${HEADERS_DIR})
 
 add_library(intflpl #SHARED
     ${SRC}
@@ -37,5 +38,5 @@ target_include_directories(intflpl
     PUBLIC ibex
 )
 
-install(FILES ${HEADERS} DESTINATION include)
-install(TARGETS intflpl DESTINATION lib)
+install(FILES ${HEADERS} DESTINATION include/intflpl)
+install(TARGETS intflpl DESTINATION lib/intflpl)

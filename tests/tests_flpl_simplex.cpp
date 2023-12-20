@@ -1,7 +1,7 @@
 #include <cstdio>
 #include "catch.hpp"
 #include <ibex.h>
-#include <flpl.h>
+#include <intflpl.h>
 
 using namespace Catch;
 using namespace Detail;

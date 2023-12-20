@@ -710,6 +710,99 @@ POLYOP_RET CstrVectMap::and_constraint(const IntervalVector &box,
     return POL_CHANGED;
 }
 
+/* WARNING : untested code */
+double dist_csts_box(const IntervalVector &ivbox,
+       const Vector &v1, const Interval& b, const Vector &obj) {
+   double lambda=1.0;
+   int dim = ivbox.size();
+   int actsign = 0; /* unknown sign */
+   bool ok=false;
+   while (!ok) {
+      /* compute : the differential wrt lambda of our sum,
+         as well as the value */
+      Interval diff(0.0);
+      double nextup=lambda, varup=-1.0;
+      double nextdown=lambda, vardown=1.0;
+      if (lambda>0.0) { 
+	 diff = b.ub(); 
+         nextdown=0.0; vardown=-b.diam();
+      } else {
+         diff = b.lb();
+         nextup=0.0; varup=b.diam(); /* note: should not be used... */
+      }
+      for (int i=0;i<dim;i++) {
+          double limit=obj[i]-lambda*v1[i];
+          if (limit<0.0) {
+              diff -= v1[i]*ivbox[i].lb();
+              if (v1[i]!=0.0) {
+                 double nxt = obj[i]/v1[i];
+                 if (nxt>lambda) { /* v1[i]<0 */
+                    if (varup==-1.0 || nxt<nextup) {
+                        nextup=nxt;
+                        varup=-v1[i]*ivbox[i].diam();
+		    } else if (nxt==nextup) {
+                        varup-=v1[i]*ivbox[i].diam();
+                    }
+	         } else if (nxt<lambda) { /* v1[i]>0 */
+                    if (vardown==-1.0 || nxt>nextdown) {
+                        nextdown=nxt;
+                        vardown=-v1[i]*ivbox[i].diam();
+		    } else if (nxt==nextdown) {
+                        vardown-=v1[i]*ivbox[i].diam();
+                    }
+                 } else  /* should not happen, but if */
+		    diff -= v1[i]*(ivbox[i]-ivbox[i].lb());
+	      }
+          }
+          else if (limit>0.0) {
+              diff -= v1[i]*ivbox[i].ub();
+              if (v1[i]!=0.0) {
+                 double nxt = obj[i]/v1[i];
+                 if (nxt>lambda) { /* v1[i]>0 */
+                    if (varup==-1.0 || nxt<nextup) {
+                        nextup=nxt;
+                        varup=v1[i]*ivbox[i].diam();
+		    } else if (nxt==nextup) {
+                        varup+=v1[i]*ivbox[i].diam();
+                    }
+	         } else if (nxt<lambda) { /* v1[i]<0 */
+                    if (vardown==-1.0 || nxt>nextdown) {
+                        nextdown=nxt;
+                        vardown=v1[i]*ivbox[i].diam();
+		    } else if (nxt==nextdown) {
+                        vardown+=v1[i]*ivbox[i].diam();
+                    }
+                 } else  /* should not happen, but if */
+		    diff -= v1[i]*(ivbox[i]-ivbox[i].ub());
+	      }
+          } else diff -= obj[i]*ivbox[i];
+      }
+      if (diff.contains(0.0)) break;
+      if (diff.lb()>0.0) {
+          if (actsign==-1) break;
+          actsign=1; 
+          if (nextdown==lambda) 
+		/* we cannot go on. It should not happen,
+		so we quit */
+	       break;
+          lambda=nextdown;
+          if (diff.lb()+vardown<=0.0) break; 
+      } else if (diff.ub()<0.0) {
+          if (actsign==1) break;
+          actsign=-1;
+          if (nextup==lambda) 
+		/* we cannot go on. It should not happen,
+		so we quit */
+	       break;
+          lambda=nextup;
+          if (diff.ub()+varup>=0.0) break; 
+      }
+   } 
+   /* compute lambda b + (obj-lambda v1) ivbox */ 
+   Interval gap = lambda * b + (obj-lambda*v1) * ivbox;
+   return gap.ub();
+}
+
 
 }
 

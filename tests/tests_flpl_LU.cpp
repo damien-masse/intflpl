@@ -1,7 +1,7 @@
 #include <cstdio>
 #include "catch.hpp"
 #include <ibex.h>
-#include <flpl.h>
+#include <intflpl.h>
 
 using namespace Catch;
 using namespace Detail;
@@ -94,6 +94,18 @@ TEST_CASE("LU")
      CHECK (X2f[2] == Interval::zero());
      CHECK (X2f[3] == Interval(-0.5));
      CHECK (X2f[4] == Interval(-10.625));
+  }
+  SECTION("Test LU for matrix inversion")
+  {
+     IntervalMatrix M(4,4);
+     M[0][0]=0.96; M[0][1]=-1.0; M[0][2]=2.0; M[0][3]=1.4;
+     M[1][0]=2.0; M[1][1]=1.0; M[1][2]=-1.0; M[1][3]=0.1;
+     M[2][0]=-1.0; M[2][1]=-1.0; M[2][2]=0.0; M[2][3]=-10.0;
+     M[3][0]=-6.0; M[3][1]=8.0; M[3][2]=-5.0; M[3][3]=0.0;
+     IntLU lu(M,false,true);  
+     IntervalMatrix invM = lu.getInvB();
+     IntervalMatrix res = (invM*M - Matrix::eye(4));
+     CHECK (infinite_norm(res) <= 1e-10);
   }
 }
 

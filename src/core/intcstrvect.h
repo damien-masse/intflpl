@@ -106,8 +106,24 @@ std::list<Vector>
                  std::vector<cstrrhs_status> clstats,
                  const CstrVectMap &csts, const CstrVect &cstF, bool upper);
 
+/** constraint satisfy vector */
+inline bool cst_satisfy_vec(const std::pair<CstrVect,CstrRhs> &cst, const Vector &v) {
+   return cst.second.val.contains(cst.first.vect*v);
+}
+
+/** constraint intersect box */
+inline bool cst_intersect_box(const std::pair<CstrVect,CstrRhs> &cst, const IntervalVector &bx) {
+   return cst.second.val.intersects(cst.first.vect*bx);
+}
+
+/** box is in constraint */
+inline bool cst_satisfy_box(const std::pair<CstrVect,CstrRhs> &cst, const IntervalVector &bx) {
+   return (cst.first.vect*bx).is_subset(cst.second.val);
+}
+/** compute the "distance" a constraint+box has wrt a constraint */
+double dist_csts_box(const IntervalVector &ivbox,
+       const Vector &v1, const Interval& b, const Vector &obj);
+
 }
 
 #endif
-      
-     
