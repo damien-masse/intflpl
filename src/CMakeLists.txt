@@ -32,7 +32,7 @@ find_path(INTFLPL_INCLUDE_DIR intflpl.h
           PATH_SUFFIXES include/intflpl)
 
 find_library(INTFLPL_LIBRARY NAMES intflpl
-             PATH_SUFFIXES lib)
+             PATH_SUFFIXES lib/intflpl)
 
 set(INTFLPL_VERSION ${PROJECT_VERSION})
 set(INTFLPL_LIBRARIES \${INTFLPL_LIBRARY})

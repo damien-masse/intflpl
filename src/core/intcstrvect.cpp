@@ -521,7 +521,7 @@ int simplify_polyhedron(int dim, IntervalVector &ivbox,
 #endif
          upper = simp.get_objective_value();
          if (upper<(*csts_it).second.val.lb()) { inc.set_empty(); return -1; }
-         if (upper-(*csts_it).second.val.ub()>1e-10) { /* FIXME : threshold */
+         if (upper-(*csts_it).second.val.ub()>0.0) { /* FIXME : threshold */
 		assign_filter(csts_it->second.status,rhs_ubnr,rhs_ubfilter);
                 upper = (*csts_it).second.val.ub();
          }
@@ -560,7 +560,7 @@ int simplify_polyhedron(int dim, IntervalVector &ivbox,
 #endif
          lower = -simp.get_objective_value();
          if (lower>(*csts_it).second.val.ub()) { inc.set_empty(); return -1; }
-         if (lower-(*csts_it).second.val.lb()<-1e-10) { /* FIXME : threshold */
+         if (lower-(*csts_it).second.val.lb()<0.0) { /* FIXME : threshold */
 		assign_filter(csts_it->second.status,rhs_lbnr,rhs_lbfilter);
                 lower = (*csts_it).second.val.lb();
          }

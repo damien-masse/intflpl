@@ -26,6 +26,11 @@
 
 namespace intflpl {
 
+class IntPoly;
+
+IntPoly sum_tau(const IntPoly& iv, const IntervalVector& V,
+                                                bool keep=false);
+
 /** representation of polyhedron with ivbox and interval constraints */
 class IntPoly
 {
@@ -245,8 +250,6 @@ class IntPoly
       IntPoly& operator-=(const IntervalVector& V);
       friend IntPoly operator+(const IntPoly& iv, const IntervalVector& V);
       friend IntPoly operator-(const IntPoly& iv, const IntervalVector& V);
-      friend IntPoly sum_tau(const IntPoly& iv, const IntervalVector& V,
-                                                bool keep);
       /* fast operations */
       IntPoly& sumFast(const IntPoly& iv);
       IntPoly& diffFast(const IntPoly& iv);
@@ -267,6 +270,8 @@ class IntPoly
                 const IntervalMatrix& M,
                 const IntervalVector& V);
 
+      friend IntPoly sum_tau(const IntPoly& iv, const IntervalVector& V,
+                                                bool keep);
 #if 0
       /**
        * union with     box[d->val] 
@@ -311,7 +316,7 @@ class IntPoly
        */
 //      ConvexPolygon over_polygon(const Matrix& M) const;
 
-      void vertices2D(std::vector<double>&x, std::vector<double>&y);
+      void vertices2D(std::vector<double>&x, std::vector<double>&y) const;
       std::list<Vector> facet3D() const;
       std::list<std::list<Vector>> getFacets3D(const IntervalVector& iv, bool with_doors=true) const;
 

@@ -119,6 +119,8 @@ Interval IntPoly::bound_cstFast(const CstrVect &cvect) const {
          el--;
          if (el->first.vdim!=cvect.vdim) return ret;
     }
+//    std::cout << "bound cst: " << el->first.vect << " " << cvect.vect << " " 
+// << (el->first==cvect) << "\n";
     if (el->first==cvect) { ret &= el->second.val; return ret; }
     ret &= el->second.val + (cvect.vect-el->first.vect)*this->Box;
     return ret;
@@ -130,7 +132,9 @@ const {
     if (pstatus[INTPOLY_INVALID] || pstatus[INTPOLY_UNBOUNDED]) return false;
     /* basic checks first */
     Interval fastbound = this->bound_cstFast(cst.first);
-    if (fastbound.is_subset(cst.second.val)) return true;
+    if ((cst.second.status[LB_R] || fastbound.lb()>=cst.second.val.lb())
+	&& (cst.second.status[UB_R] || fastbound.ub()<=cst.second.val.ub()))
+       return true;
     Interval result = simplex_form(dim,this->Box,this->BoxStat,
 			this->csts,cst.first.vect); 
     /* FIXME : on peut peut-être éviter de faire les deux bornes ? */
@@ -175,6 +179,7 @@ double IntPoly::rel_distanceFast(const IntPoly& Q) const {
 			return POS_INFINITY;
     if (pstatus[INTPOLY_UNBOUNDED]) return 0.0;
     double dist= this->Box.rel_distance(Q.Box);
+//    std::cout << "rel_distance box : " << dist << "\n";
     for (const std::pair<CstrVect,CstrRhs>& cst : this->csts) { 
         Interval b = Q.bound_cstFast(cst.first);
         double d2 = cst.second.val.rel_distance(b);
@@ -275,32 +280,35 @@ IntPoly& IntPoly::operator=(const IntervalVector& x) {
     return (*this);
 }
 
+static void inflate_interval_from_base
+		(Interval &a, const Interval &b, double fact) {
+     double mn = fact*(b.lb() - a.lb());
+     if (mn>0) mn=0.0;
+     double mx = fact*(b.ub() - a.ub());
+     if (mx<0) mx=0.0;
+     Interval ev(mn,mx);
+     a += ev;
+}
+
 void IntPoly::inflate_from_baseFast(const IntPoly &iv, double fact) {
-    bool direct=(fact<=1.0);
-    if (direct) this->Box=(1.0-fact)*this->Box+fact*iv.Box;
-    else 
     for (int i=0;i<dim;i++) {
-        Interval gap (iv.Box[i].lb()-this->Box[i].lb(),
-				iv.Box[i].ub()-this->Box[i].ub());
-        if (!gap.is_empty()) this->Box[i] += gap*fact;
+	inflate_interval_from_base(this->Box[i],iv.Box[i],fact);
     }
     for (std::pair<const CstrVect,CstrRhs>& cst : csts) { 
         Interval b = iv.bound_cstFast(cst.first);
         Interval &I(cst.second.val);
-        if (direct) I = (1.0-fact)*I+b*I;
-        else {
-          Interval gap (b.lb()-I.lb(),b.ub()-I.ub());
-          if (!gap.is_empty()) I += gap*fact;
-        }
+	inflate_interval_from_base(I,b,fact);
     }
+//    std::cout << "inflate_before_minimize " << (*this) << "\n";
     this->minimize(rhs_nrfilter | rhs_rtfilter); /* FIXME : mieux faire ? */
+//    std::cout << "inflate_after_minimize " << (*this) << "\n";
 }
 
 IntPoly& IntPoly::linMult(const IntervalMatrix& M, const IntervalMatrix& IM) {
     if (pstatus[INTPOLY_EMPTY] || pstatus[INTPOLY_INVALID]) return (*this);
     if (pstatus[INTPOLY_UNBOUNDED]) return (*this);
     IntervalVector oldBox=this->Box;
-    this->Box = IM*this->Box;
+    this->Box = M*this->Box;
     CstrVectMap ocsts;
     csts.swap(ocsts);
     for (int i=0;i<dim;i++) {
@@ -308,10 +316,11 @@ IntPoly& IntPoly::linMult(const IntervalMatrix& M, const IntervalMatrix& IM) {
        this->add_cst(V,oldBox[i]);
     }
     for (const std::pair<CstrVect,CstrRhs>& cst : ocsts) { 
-        IntervalVector V(IM*cst.first.vect);
+        IntervalVector V(cst.first.vect*IM);
         const Interval &I(cst.second.val);
         this->add_cst(V,I);
     }
+//    std::cout << "après linMult avant minimize : " << (*this) << "\n";
     this->minimize(rhs_nrfilter | rhs_rtfilter); /* FIXME : mieux faire ? */
     return (*this);
 }
@@ -324,11 +333,17 @@ bool IntPoly::is_subset (const IntPoly &Q) const {
     if (pstatus[INTPOLY_INVALID] || pstatus[INTPOLY_UNBOUNDED]) return false;
     if (Q.pstatus[INTPOLY_INVALID]) return false;
     if (pstatus[INTPOLY_EMPTY]) return true;
-    if (!this->Box.is_subset(Q.Box)) return false;
+    if (!this->Box.is_subset(Q.Box)) return false; /* revoir ! */
     for (const std::pair<CstrVect,CstrRhs> &ct : Q.csts) {
-        if (!this->satisfy_cst(ct)) return false;
+        if (!this->satisfy_cst(ct)) {
+           return false;
+        }
     }
     return true;
+}
+
+bool IntPoly::is_subsetFast (const  IntPoly &Q) const {
+    return this->is_subset(Q);
 }
 
 bool IntPoly::is_subset (const IntervalVector &IV) const {
@@ -563,15 +578,16 @@ bool IntPoly::add_cst(const IntervalVector& V, const Interval& I) {
     Interval fcheck = V*this->Box;
     if (fcheck.is_subset(I)) return false;
     if (fcheck.is_disjoint(I)) {
+//        std::cout << "is_disjoint : " << I << " " << fcheck << "\n";
         this->set_empty();
         return true;
     }
     if (!(V*this->Inc).is_subset(I)) this->Inc.set_empty(); /* we'll have to
             compute it */ /* FIXME : try to keep it */
-//    std::cerr << "add_cst before " << this->Box << " " << V << " " << I << "\n";
+//    std::cout << "add_cst before " << this->Box << " " << V << " " << I << "\n";
     Interval bounds(I);
     CstrVect cv = traduit_vect(this->Box, V, bounds);
-//    std::cerr << "add_cst " << cv.vdim << " " << cv.bdim << " " << cv.vect << " " << bounds << "\n";
+//    std::cout << "add_cst " << cv.vdim << " " << cv.bdim << " " << cv.vect << " " << bounds << "\n";
     if (fabs(cv.vdim)<threshold) { /* almost a dimension */
        cv.vect[cv.bdim]=0.0; /* to get the "rest" */
        bounds+=cv.vect*this->Box;
@@ -760,6 +776,7 @@ IntPoly &IntPoly::operator|=(const IntPoly &Q) {
        this->Inc=Q.Inc;
        this->minimized=Q.minimized;
        this->dim_not_flat=Q.dim_not_flat;
+       this->pstatus=Q.pstatus;
        return (*this);
     }
     if (this->Inc.is_empty()) this->Inc=Q.Inc;
@@ -996,7 +1013,9 @@ void IntPoly::cmult_and_add(const Vector& center,
 {
     if (pstatus[INTPOLY_INVALID] || pstatus[INTPOLY_UNBOUNDED] 
 	|| pstatus[INTPOLY_EMPTY]) return;
+//    std::cout << "avant linMult : " << (*this) << "\n";
     this->linMult(M,invM);
+//    std::cout << "après linMult : " << (*this) << "\n";
     (*this) += (-M*center + center +V);
 }
 
@@ -1008,13 +1027,14 @@ void IntPoly::ctau_mult_and_add(const Vector& center,
 	|| pstatus[INTPOLY_EMPTY]) return;
     Interval tau(0.0,1.0);
     IntervalVector cBox = Box-center;
+//    std::cout << "M*cBox" << M*cBox << "\nV : " << V << "\n";
     this->Box += tau*(M*cBox+V);
     if (this->is_box()) return;
     for (std::pair<const CstrVect,CstrRhs>& cst : csts) { 
         Interval &I(cst.second.val);
         I += tau*((cst.first.vect*M)*(Box-center)+(cst.first.vect)*V);
     }
-    minimized=rhs_rtfilter | rhs_nrfilter;
+    this->minimize(rhs_rtfilter | rhs_nrfilter);
 }
 
 /* this algorithm is not the most effective one for what we want... 
@@ -1140,7 +1160,7 @@ std::ostream& operator<< (std::ostream &str, const IntPoly& C) {
    return str;
 }
 
-void IntPoly::vertices2D(std::vector<double>&X, std::vector<double>&Y) {
+void IntPoly::vertices2D(std::vector<double>&X, std::vector<double>&Y) const {
    assert(dim==2);
 //   std::cerr << "vertices2D " << *this << "\n";
    X.clear(); Y.clear();
